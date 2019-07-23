@@ -1,0 +1,215 @@
+#!/usr/bin/perl
+
+use English;
+use Getopt::Long qw(:config);
+use Pod::Usage;
+use strict;
+use POSIX qw (tan atan);
+
+=pod
+
+=head1 NAME
+
+B<Convert_Latitude> - Convert between planetographic and planetocentric
+latitudes.
+
+=head1 SYNOPSIS
+
+Convert_Latitude [<--centric>] I<input_latitude>
+
+Convert_Latitude B<--graphic> I<input_latitude>
+
+Convert_Latitude B<--usage>
+
+Convert_Latitude B<--help>
+
+Convert_Latitude B<--man>
+
+Convert_Latitude [B<--version>]
+
+=head1 DESCRIPTION
+
+B<Convert_Latitude> transforms a latitude in one Mars coordinate system to the
+other, either from planetographic to planetocentric or vice versa. By default,
+if no other argument is given, B<Convert_Latitude> assumes the I<input_latitude>
+is in planetocentric coordinates and reports it in planetographic coordinates.
+Note that I<input_latitude> should be an absolute value.
+
+The program uses the IAU2000 values for Mars's equitorial radius and its polar
+radius.
+
+=head1 OPTIONS
+
+B<Convert_Latitude> recognizes the following options:
+
+=over 4
+
+=item B<-c>, B<--centric>
+
+Treat the input latitude as being in the planetocentric coordinate system; the
+output will be in planetographic coordinates. This mode is the default behavior.
+
+=item B<-g>, B<--graphic>
+
+Treat the input latitude as being in the planetographic coordinate system; the
+output will be in planetocentric coordinates. 
+
+=item B<-u>, B<--usage>
+
+Display a short usage statement and exit.
+
+=item B<-h>, B<--help>
+
+Display an expanded usage statement and exit.
+
+=item B<-m>, B<--man>
+
+Display this manual page and exit.
+
+=item B<-v>, B<--version>
+
+Display the version number and exit. This is the default mode if no arguments
+are supplied on the command line.
+
+=back
+
+=head1 DIAGNOSTICS
+
+B<Convert_Latitude> exits with status code 0 if it succeeds, 2 if it fails.
+
+=head1 AUTHOR
+
+Christian Schaller, UA/PIRL
+
+=head1 COPYRIGHT
+
+Copyright (C) 2006 Arizona Board of Regents on behalf of the Planetary Image
+Research Laboratory, Lunar and Planetary Laboratory at the University of
+Arizona.
+
+This program is free software; you can redistribute it and/or modify it under
+the terms of the GNU General Public License, version 2, as published by the Free
+Software Foundation.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with
+this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+Place - Suite 330, Boston, MA  02111-1307, USA.
+
+=head1 VERSION
+
+1.6
+
+=cut
+
+use constant SUCCESS					=> 0;
+use constant FAILURE					=> 2;
+
+use constant C_A_SQUARED 				=> (3376.2/3396.19)*(3376.2/3396.19);
+use constant PI							=> atan(1) * 4.0;
+use constant DEG_TO_RAD					=> PI/180.0;
+
+(my $command_name = $0) =~ s|.*/(\S+)$|\1|;
+
+my $usage_flag;
+my $help_flag = undef;
+my $man_flag = undef;
+my $version_flag = undef;
+
+my $graphic_flag = undef;
+my $centric_flag = undef;
+
+if ($#ARGV == -1) { $usage_flag = 1; }
+
+GetOptions (
+	"graphic"							=> \$graphic_flag,
+	"centric"							=> \$centric_flag,
+	"usage"                             => \$usage_flag,
+	"man"								=> \$man_flag,
+	"help"								=> \$help_flag,
+	"version"							=> \$version_flag
+) || DO {
+    print STDERR "The command-line options are incorrect.\n";
+    pod2usage (
+        -exitval => FAILURE,
+        -verbose => 0
+    );
+};
+
+pod2usage (-exitval => SUCCESS, -verbose => 1) if $help_flag;
+pod2usage (-exitval => SUCCESS, -verbose => 2) if $man_flag;
+pod2usage (-exitval => SUCCESS, -verbose => 0) if $usage_flag;
+
+    
+if ($version_flag)
+{
+	print "$command_name\n";
+	exit (SUCCESS);
+}
+
+if ($graphic_flag && $centric_flag)
+{
+	print "Specify EITHER planetocentric OR planetographic input only, not both.\n";
+	exit (FAILURE);
+}
+
+unless ($ARGV[0] =~ /^\d*\.?\d*$/) {
+    print "The latitude to convert must be numeric.\n";
+    exit (FAILURE);
+}
+
+my $input_lat = $ARGV[0];
+my $output_lat;
+
+if ($graphic_flag)
+{
+	$output_lat = centric_lat ($input_lat);
+}
+else
+{
+	$output_lat = graphic_lat ($input_lat);
+}
+
+printf ("%.4f %s\n", $output_lat, ($graphic_flag ? "centric" : "graphic"));
+
+exit (SUCCESS);
+
+#===============================================================================
+# Subroutines
+#===============================================================================
+
+#-------------------------------------------------------------------------------
+# centric_lat (\$graphic_lat)
+#-------------------------------------------------------------------------------
+
+sub centric_lat
+{
+my ($graphic_lat) = @_;
+return
+	atan (
+		tan ($graphic_lat * DEG_TO_RAD) * C_A_SQUARED
+	) / DEG_TO_RAD;
+}
+
+#-------------------------------------------------------------------------------
+# graphic_lat (\$centric_lat)
+#-------------------------------------------------------------------------------
+
+sub graphic_lat
+{
+my ($centric_lat) = @_;
+return
+	atan (
+		tan ($centric_lat * DEG_TO_RAD) / C_A_SQUARED
+	) / DEG_TO_RAD;
+}
+
+__END__
+
+November 22, 2013 - NFB
+    - Added a usage option and changed output to show usage if run with no arguments (Mantis 1091)
+    - Reinstated an error if an unknown option is given on the command line (Mantis 1091)
+    - Added an error message if a non-numeric argument is given
